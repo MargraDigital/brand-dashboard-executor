@@ -14,6 +14,11 @@ def execute():
         return jsonify({'error': 'Missing code field'}), 400
 
     code = data['code']
+    # Strip markdown fences if Claude includes them
+    if code.startswith('```'):
+        code = code.split('\n', 1)[1]
+    if code.endswith('```'):
+        code = code.rsplit('```', 1)[0]
 
     with tempfile.TemporaryDirectory() as tmpdir:
         script_path = os.path.join(tmpdir, 'script.py')
