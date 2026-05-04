@@ -1,5 +1,5 @@
 from flask import Flask, request, send_file, jsonify
-import subprocess, tempfile, os
+import subprocess, tempfile, os, shutil
 
 app = Flask(__name__)
 
@@ -10,34 +10,32 @@ def health():
 @app.route('/execute', methods=['POST'])
 def execute():
     data = request.get_json(force=True)
-    if not data or 'code' not in data:
-        return jsonify({'error': 'Missing code field'}), 400
-
-    code = data['code']
-    # Strip markdown fences if Claude includes them
-    if code.startswith('```'):
-        code = code.split('\n', 1)[1]
-    if code.endswith('```'):
-        code = code.rsplit('```', 1)[0]
+    if not data:
+        return jsonify({'error': 'Missing data'}), 400
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        script_path = os.path.join(tmpdir, 'script.py')
         output_path = os.path.join(tmpdir, 'dashboard.pdf')
-
-        with open(script_path, 'w') as f:
-            f.write(code)
 
         env = os.environ.copy()
         env['PDF_OUTPUT'] = output_path
+        env['WEEK'] = str(data.get('week', ''))
+        env['NAME_SEARCHES'] = str(data.get('name_searches', ''))
+        env['SESSIONS'] = str(data.get('sessions', ''))
+        env['OPEN_RATE'] = str(data.get('open_rate', ''))
+        env['SOLV'] = str(data.get('solv', ''))
+        env['SIGNAL_NAME'] = str(data.get('signal_name', ''))
+        env['SIGNAL_OPENS'] = str(data.get('signal_opens', ''))
+        env['SIGNAL_GBP'] = str(data.get('signal_gbp', ''))
+        env['SIGNAL_TRAFFIC'] = str(data.get('signal_traffic', ''))
 
         try:
             result = subprocess.run(
-                ['python3', script_path],
+                ['python3', '/opt/render/project/src/generate_pdf.py'],
                 capture_output=True, text=True,
-                timeout=90, cwd=tmpdir, env=env
+                timeout=60, env=env
             )
         except subprocess.TimeoutExpired:
-            return jsonify({'error': 'Script timed out'}), 504
+            return jsonify({'error': 'Timed out'}), 504
 
         if result.returncode != 0:
             return jsonify({'error': result.stderr[-2000:]}), 400
